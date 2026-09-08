@@ -1,0 +1,690 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Discord Trade Dashboard</title>
+<style>
+  :root{
+    --bg:#0f1117; --card:#171a23; --card2:#1d212c; --fg:#e7e9ee; --muted-fg:#9aa2b1;
+    --line:#272b36; --accent:#5865f2; --long:#3ba55d; --short:#ed4245; --warn:#faa61a;
+  }
+  @media (prefers-color-scheme:light){
+    :root{--bg:#f4f5f8;--card:#fff;--card2:#f7f8fa;--fg:#1b1e27;--muted-fg:#5b6472;--line:#e4e7ee;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:28px}
+  .wrap{max-width:1040px;margin:0 auto}
+  /* ---------- passcode gate ---------- */
+  #gate{max-width:380px;margin:12vh auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px;text-align:center}
+  #gate h1{font-size:20px;margin:0 0 6px}
+  #gate p{color:var(--muted-fg);font-size:13px;margin:0 0 18px}
+  #gate input{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--fg);font-size:15px;text-align:center;letter-spacing:2px}
+  #gate button{width:100%;margin-top:12px;padding:11px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer}
+  #gate button:disabled{opacity:.6;cursor:default}
+  #gate .msg{color:var(--short);font-size:13px;margin-top:12px;min-height:18px}
+  .lock{font-size:30px;margin-bottom:8px}
+  /* ---------- header ---------- */
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  header h1{margin:0 0 4px;font-size:24px;display:flex;align-items:center;gap:10px}
+  header p{margin:0;color:var(--muted-fg);font-size:13px}
+  .tag{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.3px}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--long);font-weight:700}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--long);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .out{background:transparent;border:1px solid var(--line);color:var(--muted-fg);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap}
+  .out:hover{color:var(--fg);border-color:var(--muted-fg)}
+  /* ---------- channel tabs ---------- */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 0}
+  .tab{background:var(--card);border:1px solid var(--line);color:var(--muted-fg);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600}
+  .tab:hover{color:var(--fg)}
+  .tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tab .c{opacity:.7;margin-left:5px;font-size:11px}
+  /* ---------- kpis ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .kpi .n{font-size:26px;font-weight:750;letter-spacing:-.5px}
+  .kpi .l{color:var(--muted-fg);font-size:12px;margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+  .grid{display:grid;grid-template-columns:1fr;gap:18px}
+  @media(min-width:820px){.grid{grid-template-columns:1.6fr 1fr}}
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+  section h2{margin:0 0 14px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted-fg)}
+  /* ---------- messages ---------- */
+  .msg{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .msg:last-child{margin-bottom:0}
+  .msg.new{animation:flash 1.2s ease-out}
+  @keyframes flash{from{box-shadow:0 0 0 2px var(--accent)}to{box-shadow:none}}
+  .msg-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+  .who{display:flex;gap:10px;align-items:center}
+  .av{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700}
+  .who b{display:block;font-size:14px}
+  .who time{color:var(--muted-fg);font-size:12px}
+  .chan{font-size:11px;color:var(--muted-fg);background:var(--line);border-radius:5px;padding:1px 6px;margin-left:6px}
+  .badge{font-size:11px;font-weight:700;color:var(--c);border:1px solid var(--c);border-radius:20px;padding:3px 9px;white-space:nowrap}
+  .body{white-space:pre-wrap;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:transparent;margin:0;color:var(--fg);opacity:.92}
+  .signal{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--card)}
+  .signal.exit{border-color:color-mix(in srgb,var(--short) 45%,var(--line))}
+  .sig-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .tk{font-weight:800;font-size:18px;letter-spacing:-.5px}
+  .dir{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--line)}
+  .dir.long{background:color-mix(in srgb,var(--long) 22%,transparent);color:var(--long)}
+  .dir.short{background:color-mix(in srgb,var(--short) 22%,transparent);color:var(--short)}
+  .rr{margin-left:auto;font-size:11px;font-weight:700;color:var(--accent);border:1px solid var(--accent);padding:2px 8px;border-radius:6px;font-family:ui-monospace,Menlo,monospace}
+  .kind{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--muted-fg);border:1px solid var(--line);padding:2px 6px;border-radius:5px}
+  .warns{margin-top:10px;font-size:12px;color:var(--warn);line-height:1.6}
+  .sig-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px}
+  .sig-grid>div{background:var(--card2);border-radius:8px;padding:8px 10px}
+  .sig-grid span{display:block;font-size:11px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.3px}
+  .sig-grid b{font-size:14px}
+  .sig-grid .sl b{color:var(--short)}
+  .bar-row{display:grid;grid-template-columns:130px 1fr 24px;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
+  .bl{color:var(--muted-fg)}
+  .bt{background:var(--card2);border-radius:6px;height:12px;overflow:hidden}
+  .bt i{display:block;height:100%;border-radius:6px;transition:width .4s}
+  .bar-row b{text-align:right}
+  .srow{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px;font-size:13px}
+  .note{color:var(--muted-fg);font-size:12px;margin-top:14px;line-height:1.5}
+  footer{color:var(--muted-fg);font-size:12px;text-align:center;margin-top:26px}
+  .err{background:color-mix(in srgb,var(--short) 12%,transparent);border:1px solid var(--short);color:var(--short);border-radius:12px;padding:14px;margin:18px 0;font-size:13px}
+  /* ---------- alpaca / approval ---------- */
+  .acct{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted-fg);margin-top:8px}
+  .acct b{color:var(--fg)}
+  .paper{background:color-mix(in srgb,var(--long) 18%,transparent);color:var(--long);border:1px solid var(--long);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:800;letter-spacing:.4px}
+  .liveflag{background:color-mix(in srgb,var(--short) 18%,transparent);color:var(--short);border:1px solid var(--short);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:800;letter-spacing:.4px}
+  .trade-btn{margin-top:10px;width:100%;padding:9px;border-radius:9px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer}
+  .trade-btn:hover{background:var(--accent);color:#fff}
+  .trade-btn.done{border-color:var(--long);color:var(--long);cursor:default}
+  .trade-btn.done:hover{background:transparent;color:var(--long)}
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:20px;z-index:50}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:520px;width:100%;max-height:90vh;overflow:auto}
+  .modal h3{margin:0 0 4px;font-size:17px}
+  .modal .subtle{color:var(--muted-fg);font-size:12px;margin:0 0 16px}
+  .desc{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:15px;font-weight:700;line-height:1.5}
+  .payload{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;font:11px/1.5 ui-monospace,Menlo,monospace;color:var(--muted-fg);white-space:pre;overflow-x:auto}
+  .qty-row{display:flex;align-items:center;gap:10px;margin-top:14px}
+  .qty-row label{font-size:13px;color:var(--muted-fg)}
+  .qty-row input{width:90px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--fg);font-size:15px;font-weight:700;text-align:center}
+  .cost{margin-left:auto;font-size:13px}
+  .cost b{font-size:17px}
+  .modal-warn{background:color-mix(in srgb,var(--warn) 12%,transparent);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:11px;margin-top:12px;font-size:12px;line-height:1.6}
+  .btns{display:flex;gap:10px;margin-top:18px}
+  .btns button{flex:1;padding:11px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;border:1px solid var(--line)}
+  .cancel{background:transparent;color:var(--muted-fg)}
+  .cancel:hover{color:var(--fg)}
+  .place{background:var(--long);border-color:var(--long);color:#fff}
+  .place:disabled{opacity:.5;cursor:default}
+  .modal-err{color:var(--short);font-size:12px;margin-top:12px}
+  .ok-box{background:color-mix(in srgb,var(--long) 12%,transparent);border:1px solid var(--long);color:var(--long);border-radius:10px;padding:14px;font-size:13px;line-height:1.6}
+  /* ---------- order state on a card ---------- */
+  .order{margin-top:10px;border:1px solid var(--c);border-radius:9px;padding:9px 11px;background:color-mix(in srgb,var(--c) 8%,transparent)}
+  .o-top{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px}
+  .o-status{color:var(--c);font-weight:800;letter-spacing:.4px}
+  .o-qty{color:var(--muted-fg)}
+  .pl{margin-top:7px;font-size:13px;font-weight:800;color:var(--c);display:flex;gap:8px;align-items:baseline}
+  .pl span{font-weight:600;font-size:11px;opacity:.85}
+  .pl .mk{margin-left:auto;color:var(--muted-fg)}
+  /* ---------- positions panel ---------- */
+  .pos{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .pos:last-child{border-bottom:0}
+  .pos b{display:block;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .pos span{color:var(--muted-fg);font-size:11px}
+  .pos-pl{text-align:right;font-weight:800;color:var(--c)}
+  .pos-pl span{display:block;font-weight:600;color:var(--c);opacity:.8}
+  .pos.total{border-top:1px solid var(--line);margin-top:4px;padding-top:10px}
+  /* ---------- settings ---------- */
+  .guild{margin-top:14px}
+  .guild-name{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted-fg);margin-bottom:6px}
+  .chan-row{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--card2);font-size:13px}
+  .chan-row:hover{border-color:var(--accent)}
+  .chan-row input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+  .chan-row input:disabled{cursor:default}
+  .ptext{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--fg);font:13px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
+</style></head><body>
+
+<!-- ========== PASSCODE GATE ========== -->
+<div id="gate" hidden>
+  <div class="lock">🔒</div>
+  <h1>Trade Dashboard</h1>
+  <p>Enter the passcode to continue</p>
+  <form id="gateForm">
+    <input id="pass" type="password" autocomplete="current-password" placeholder="passcode" autofocus>
+    <button id="gateBtn" type="submit">Unlock</button>
+  </form>
+  <div class="msg" id="gateMsg"></div>
+</div>
+
+<!-- ========== DASHBOARD ========== -->
+<div class="wrap" id="app" hidden>
+  <header>
+    <div>
+      <h1 id="title">Trade Dashboard <span class="tag">LIVE</span></h1>
+      <p><span class="live"><span class="dot"></span>Auto-refreshing</span> · <span id="sub">connecting…</span></p>
+      <div class="acct" id="acct"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="out" id="paste">➕ Paste signal</button>
+      <button class="out" id="settings">⚙ Settings</button>
+      <button class="out" id="logout">Log out</button>
+    </div>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div id="error"></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid">
+    <section><h2>Message Feed</h2><div id="feed"></div></section>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <section><h2>Open Positions</h2><div id="positions"></div></section>
+      <section><h2>Message Types</h2><div id="types"></div></section>
+      <section><h2>Summary</h2><div id="summary"></div></section>
+    </div>
+  </div>
+  <footer id="foot">Live dashboard</footer>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+const POLL_MS = 20000;
+const TYPE_META = {
+  alert:    { label:"Trade Alert",  color:"var(--long)",    icon:"📈" },
+  update:   { label:"Trade Update", color:"var(--accent)",  icon:"✅" },
+  exit:     { label:"Exit",         color:"var(--short)",   icon:"🔻" },
+  reminder: { label:"Reminder",     color:"var(--warn)",    icon:"⚠️" },
+  general:  { label:"General",      color:"var(--muted-fg)",icon:"💬" },
+};
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = d => d ? new Date(d).toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}) : "—";
+const $ = id => document.getElementById(id);
+
+let seen = new Set();
+let latest = null;
+let filter = "all";   // channel_name or "all"
+let timer = null;
+
+/* ---------------- gate ---------------- */
+function showGate(msg){
+  if(timer){ clearInterval(timer); timer = null; }
+  $("app").hidden = true; $("gate").hidden = false;
+  $("gateMsg").textContent = msg || "";
+  $("pass").focus();
+}
+function showApp(){ $("gate").hidden = true; $("app").hidden = false; }
+
+$("gateForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const btn = $("gateBtn"); btn.disabled = true; $("gateMsg").textContent = "";
+  try{
+    const r = await fetch("/api/login",{
+      method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ passcode: $("pass").value })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error || "Login failed");
+    $("pass").value = "";
+    showApp(); start();
+  }catch(err){ $("gateMsg").textContent = err.message; }
+  finally{ btn.disabled = false; }
+});
+
+$("logout").addEventListener("click", async ()=>{
+  await fetch("/api/logout",{method:"POST"});
+  showGate("Logged out.");
+});
+
+/* ---------------- render ---------------- */
+const cell = (lab,val,cls="") =>
+  (val===null||val===undefined||val==="") ? "" : `<div class="${cls}"><span>${lab}</span><b>${esc(val)}</b></div>`;
+
+function warnHTML(w){
+  return w && w.length ? `<div class="warns">${w.map(x=>`⚠️ ${esc(x)}`).join("<br>")}</div>` : "";
+}
+
+function optionHTML(t){
+  const isCall = t.type === "C";
+  return `<div class="signal"><div class="sig-head">
+      <span class="tk">$${esc(t.ticker)}</span>
+      <span class="dir ${isCall?"long":"short"}">${isCall?"CALL":"PUT"}</span>
+      <span class="kind">OPTION</span>
+      <span class="rr">${esc(t.occ)}</span>
+    </div><div class="sig-grid">
+      ${cell("Strike","$"+t.strike)}
+      ${cell("Expiry",t.expiry)}
+      ${cell("Premium","$"+Number(t.premium).toFixed(2))}
+      ${cell("Side",(t.side||"").toUpperCase())}
+    </div>${warnHTML(t.warnings)}</div>`;
+}
+
+function stockHTML(t){
+  const dir = t.direction ? `<span class="dir ${/long|bull/i.test(t.direction)?"long":/short|bear/i.test(t.direction)?"short":""}">${esc(t.direction)}</span>` : "";
+  return `<div class="signal"><div class="sig-head">
+      <span class="tk">$${esc(t.ticker||"?")}</span>${dir}
+      <span class="kind">STOCK</span>
+      ${t.rr?`<span class="rr">R:R ${esc(t.rr)}</span>`:""}
+    </div><div class="sig-grid">
+      ${cell("Entry",t.entry)}${cell("Target 1",t.t1)}${cell("Target 2",t.t2)}${cell("Stop Loss",t.stop,"sl")}
+    </div>${warnHTML(t.warnings)}</div>`;
+}
+
+const STATUS_COLOR = (s, open) =>
+  s === "filled" ? "var(--long)"
+  : ["canceled","expired","rejected"].includes(s) ? "var(--short)"
+  : open ? "var(--warn)" : "var(--muted-fg)";
+
+function money(n){
+  const v = Number(n);
+  if(!isFinite(v)) return "—";
+  return (v<0?"-":"")+"$"+Math.abs(v).toFixed(2);
+}
+
+// Order state comes from Alpaca (source of truth), so it survives reloads.
+function orderHTML(o){
+  if(!o) return "";
+  const col = STATUS_COLOR(o.status, o.open);
+  const fill = o.filled_avg_price ? ` @ ${money(o.filled_avg_price)}` : "";
+  const p = o.position;
+  const pl = p ? Number(p.unrealized_pl) : null;
+  const plHTML = p
+    ? `<div class="pl" style="--c:${pl>=0?"var(--long)":"var(--short)"}">
+         ${pl>=0?"▲":"▼"} ${money(p.unrealized_pl)}
+         <span>(${(Number(p.unrealized_plpc)*100).toFixed(1)}%)</span>
+         <span class="mk">mark ${money(p.current_price)}</span>
+       </div>` : "";
+  return `<div class="order" style="--c:${col}">
+      <div class="o-top">
+        <span class="o-status">${esc(o.status.toUpperCase())}${o.open?" · working":""}</span>
+        <span class="o-qty">${esc(o.filled_qty||"0")}/${esc(o.qty)} filled${fill}</span>
+      </div>
+      ${plHTML}
+    </div>`;
+}
+
+function exitHTML(t){
+  const kindWord = t.action === "close" ? "SELL ALL" : "TRIM";
+  return `<div class="signal exit"><div class="sig-head">
+      <span class="tk">$${esc(t.ticker)}</span>
+      <span class="dir short">${kindWord}</span>
+      <span class="kind">EXIT · ${t.type==="C"?"CALL":"PUT"}</span>
+      ${t.pct!=null?`<span class="rr">${esc(t.pct)}%</span>`:""}
+    </div><div class="sig-grid">
+      ${cell("Strike","$"+t.strike)}
+      ${cell("Action",t.action==="close"?"Close all":"Trim")}
+      ${cell("Side","SELL")}
+    </div>${warnHTML(t.warnings)}</div>`;
+}
+
+function tradeHTML(t, m){
+  if(!t) return "";
+  const card = t.kind === "exit" ? exitHTML(t) : t.kind === "option" ? optionHTML(t) : stockHTML(t);
+  const o = orders[m.id];
+  if(o) return card + orderHTML(o);
+  const label = t.kind === "exit" ? "Review Exit →" : "Review Trade →";
+  return card + `<button class="trade-btn" data-mid="${esc(m.id)}" data-cid="${esc(m.channel_id)}">${label}</button>`;
+}
+
+/* ---------------- approval flow ---------------- */
+let orders = {};      // message_id -> order (from Alpaca)
+let positions = [];
+
+// source is either { messageId, channelId } (Discord) or { text } (pasted).
+async function openTradeModal(source){
+  let qty = null;                 // null -> let the server suggest (exits default to held/half)
+  const root = $("modalRoot");
+
+  const draw = (state) => {
+    const p = state.preview;
+    const isExit = p && p.signal && p.signal.kind === "exit";
+    const cost = p && p.estimated_cost != null ? `$${p.estimated_cost.toFixed(2)}` : "—";
+    const flag = p ? (p.paper
+        ? `<span class="paper">PAPER</span>`
+        : `<span class="liveflag">⚠️ LIVE MONEY</span>`) : "";
+    const warns = p && p.warnings && p.warnings.length
+      ? `<div class="modal-warn"><b>Check before placing:</b><br>${p.warnings.map(w=>"• "+esc(w)).join("<br>")}</div>` : "";
+    const qtyVal = qty ?? (p ? p.order.qty : 1);
+    const qtyMax = isExit && p.exit ? p.exit.held : 100;
+
+    root.innerHTML = `<div class="backdrop" id="backdrop"><div class="modal">
+      ${state.done ? `
+        <h3>Order placed ${flag}</h3>
+        <p class="subtle">Submitted to Alpaca.</p>
+        <div class="ok-box">
+          <b>${esc(state.done.symbol)}</b> · ${esc(state.done.side)} ${esc(state.done.qty)}<br>
+          Status: <b>${esc(state.done.status)}</b><br>
+          Order ID: ${esc(state.done.id)}
+        </div>
+        <div class="btns"><button class="cancel" id="close">Close</button></div>
+      ` : `
+        <h3>${isExit ? "Review exit" : "Review trade"} ${flag}</h3>
+        <p class="subtle">Verify this against the Discord message before ${isExit ? "closing" : "placing"}.</p>
+        ${state.loading ? `<div class="desc">Loading preview…</div>` : `
+          <div class="desc">${esc(p.description)}</div>
+          ${warns}
+          <div class="qty-row">
+            <label for="qty">${isExit ? "Contracts to sell" : "Quantity"}</label>
+            <input id="qty" type="number" min="1" max="${qtyMax}" step="1" value="${qtyVal}">
+            ${isExit
+              ? `<span class="cost">Held<br><b>${p.exit ? p.exit.held : "—"}</b></span>`
+              : `<span class="cost">Est. cost<br><b>${cost}</b></span>`}
+          </div>
+          <div class="payload">${esc(JSON.stringify(p.order, null, 2))}</div>
+        `}
+        ${state.error ? `<div class="modal-err">${esc(state.error)}</div>` : ""}
+        <div class="btns">
+          <button class="cancel" id="close">Cancel</button>
+          <button class="place" id="place" ${state.loading||state.busy?"disabled":""}>
+            ${state.busy ? (isExit?"Closing…":"Placing…") : (isExit?"Sell to Close":"Place Order")}
+          </button>
+        </div>
+      `}
+    </div></div>`;
+
+    $("close").onclick = () => { root.innerHTML = ""; };
+    $("backdrop").onclick = (e) => { if(e.target.id==="backdrop") root.innerHTML=""; };
+    const qtyEl = $("qty");
+    if(qtyEl) qtyEl.onchange = async () => {
+      const v = parseInt(qtyEl.value,10);
+      if(Number.isInteger(v) && v>=1 && v<=qtyMax){ qty = v; await refresh(); }
+    };
+    const placeEl = $("place");
+    if(placeEl) placeEl.onclick = () => submit();
+  };
+
+  const srcBody = source.text != null
+    ? { text: source.text }
+    : { message_id: source.messageId, channel_id: source.channelId };
+  const call = (confirm) => fetch("/api/alpaca/place",{
+    method:"POST", headers:{"content-type":"application/json"},
+    // omit qty when null so the server can suggest a default (exits)
+    body: JSON.stringify({ ...srcBody, ...(qty!=null?{qty}:{}), confirm })
+  }).then(async r => {
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  });
+
+  async function refresh(){
+    draw({ loading:true });
+    try{
+      const p = (await call(false)).preview;
+      // adopt the server-suggested quantity (held/half for exits) into the input
+      if(qty==null && p.order && p.order.qty) qty = parseInt(p.order.qty,10);
+      draw({ preview:p });
+    }
+    catch(e){ draw({ loading:false, preview:{signal:{},description:"—",order:{},warnings:[],estimated_cost:null}, error:e.message }); }
+  }
+
+  async function submit(){
+    let cur;
+    try{ cur = (await call(false)).preview; }catch(e){ return draw({preview:null,loading:false,error:e.message}); }
+    draw({ preview:cur, busy:true });
+    try{
+      const j = await call(true);
+      draw({ done:j.placed, preview:cur });
+      await loadOrders();                 // pull real state back from Alpaca
+      if(latest) render(latest);
+    }catch(e){ draw({ preview:cur, error:e.message }); }
+  }
+
+  await refresh();
+}
+
+async function loadOrders(){
+  try{
+    const r = await fetch("/api/alpaca/orders",{cache:"no-store"});
+    if(!r.ok){ return; }                  // Alpaca not configured yet — stay quiet
+    const j = await r.json();
+    orders = j.byMessage || {};
+    positions = j.positions || [];
+    renderPositions();
+  }catch{ /* leave previous state */ }
+}
+
+function renderPositions(){
+  const el = $("positions");
+  if(!el) return;
+  if(!positions.length){
+    el.innerHTML = `<p style="color:var(--muted-fg);font-size:13px;margin:0">No open positions.</p>`;
+    return;
+  }
+  const total = positions.reduce((s,p)=>s+Number(p.unrealized_pl||0),0);
+  el.innerHTML = positions.map(p=>{
+    const pl = Number(p.unrealized_pl);
+    return `<div class="pos">
+      <div><b>${esc(p.symbol)}</b><span>${esc(p.qty)} @ ${money(p.avg_entry_price)}</span></div>
+      <div class="pos-pl" style="--c:${pl>=0?"var(--long)":"var(--short)"}">
+        ${money(p.unrealized_pl)}<span>${(Number(p.unrealized_plpc)*100).toFixed(1)}%</span>
+      </div>
+    </div>`;
+  }).join("") + `<div class="pos total">
+      <div><b>Total unrealised</b></div>
+      <div class="pos-pl" style="--c:${total>=0?"var(--long)":"var(--short)"}">${money(total)}</div>
+    </div>`;
+}
+
+/* ---------------- manual paste ---------------- */
+async function openPasteModal(){
+  const root = $("modalRoot");
+  let preview = null, debounce = null;
+
+  const draw = (err) => {
+    const p = preview;
+    const parsed = p && p.signal;
+    root.innerHTML = `<div class="backdrop" id="backdrop"><div class="modal">
+      <h3>Paste a signal</h3>
+      <p class="subtle">For alerts from servers the bot can't read. Paste the exact text.</p>
+      <textarea id="ptext" class="ptext" rows="3" placeholder="e.g.  AAPL 420C 7/17 2.5   or   NVDA 215C AVG .64 EXP 7/15"></textarea>
+      ${parsed ? `<div class="desc" style="margin-top:12px">${esc(p.description)}</div>
+        ${p.warnings&&p.warnings.length?`<div class="modal-warn">${p.warnings.map(w=>"• "+esc(w)).join("<br>")}</div>`:""}`
+        : `<p class="note" style="margin-top:10px">${err?`<span style="color:var(--short)">${esc(err)}</span>`:"Parsed preview appears here as you type."}</p>`}
+      <div class="btns">
+        <button class="cancel" id="close">Cancel</button>
+        <button class="place" id="toReview" ${parsed?"":"disabled"}>Review →</button>
+      </div>
+    </div></div>`;
+    const ta = $("ptext");
+    ta.value = window.__pasteDraft || "";
+    ta.focus();
+    ta.oninput = () => {
+      window.__pasteDraft = ta.value;
+      clearTimeout(debounce);
+      debounce = setTimeout(preflight, 350);
+    };
+    $("close").onclick = () => { root.innerHTML=""; window.__pasteDraft=""; };
+    $("backdrop").onclick = e => { if(e.target.id==="backdrop"){ root.innerHTML=""; window.__pasteDraft=""; } };
+    const rv = $("toReview");
+    if(rv) rv.onclick = () => { const t = ta.value; window.__pasteDraft=""; openTradeModal({ text:t }); };
+  };
+
+  async function preflight(){
+    const text = (window.__pasteDraft||"").trim();
+    if(!text){ preview=null; return draw(); }
+    try{
+      const r = await fetch("/api/alpaca/place",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,confirm:false})});
+      const j = await r.json();
+      if(!r.ok){ preview=null; return draw(j.error||"Not a recognised signal."); }
+      preview = j.preview; draw();
+    }catch(e){ preview=null; draw(e.message); }
+  }
+
+  draw();
+}
+$("paste").addEventListener("click", openPasteModal);
+
+/* ---------------- settings: channel selection ---------------- */
+async function openSettings(){
+  const root = $("modalRoot");
+  const draw = (s) => {
+    root.innerHTML = `<div class="backdrop" id="backdrop"><div class="modal">
+      <h3>Settings</h3>
+      <p class="subtle">Choose which Discord channels this dashboard reads.</p>
+      ${s.loading ? `<div class="desc">Loading channels the bot can see…</div>` : `
+        ${s.data.canSave ? "" : `<div class="modal-warn">${esc(s.data.note||"")}</div>`}
+        ${s.data.guilds.length ? s.data.guilds.map(g=>`
+          <div class="guild">
+            <div class="guild-name">${esc(g.guild_name)}</div>
+            ${g.channels.map(c=>`
+              <label class="chan-row">
+                <input type="checkbox" value="${esc(c.id)}" ${s.sel.has(c.id)?"checked":""} ${s.data.canSave?"":"disabled"}>
+                <span>#${esc(c.name)}</span>
+              </label>`).join("")}
+          </div>`).join("")
+          : `<div class="modal-warn">The bot cannot see any channels. Invite it to a server with View Channel + Read Message History.</div>`}
+        <p class="note" style="margin-top:14px">
+          Source: <b>${esc(s.data.source)}</b>${s.data.source==="env"?" (CHANNEL_ID)":" (saved selection)"}.
+          The bot token stays in the server's secret store and is not editable here.
+        </p>
+      `}
+      ${s.error ? `<div class="modal-err">${esc(s.error)}</div>` : ""}
+      ${s.saved ? `<div class="ok-box" style="margin-top:12px">Saved — reloading channels.</div>` : ""}
+      <div class="btns">
+        <button class="cancel" id="close">Close</button>
+        <button class="place" id="save" ${(s.loading||!s.data?.canSave||s.busy)?"disabled":""}>
+          ${s.busy?"Saving…":"Save selection"}
+        </button>
+      </div>
+    </div></div>`;
+
+    $("close").onclick = () => { root.innerHTML=""; };
+    $("backdrop").onclick = e => { if(e.target.id==="backdrop") root.innerHTML=""; };
+    root.querySelectorAll('.chan-row input').forEach(cb=>{
+      cb.onchange = () => { cb.checked ? s.sel.add(cb.value) : s.sel.delete(cb.value); };
+    });
+    const save = $("save");
+    if(save) save.onclick = async () => {
+      draw({...s, busy:true, error:null});
+      try{
+        const r = await fetch("/api/discord/channels",{
+          method:"POST", headers:{"content-type":"application/json"},
+          body: JSON.stringify({ channels:[...s.sel] })
+        });
+        const j = await r.json();
+        if(!r.ok) throw new Error(j.error||"Save failed");
+        draw({...s, busy:false, saved:true});
+        seen = new Set();
+        await tick();
+        setTimeout(()=>{ root.innerHTML=""; }, 1200);
+      }catch(e){ draw({...s, busy:false, error:e.message}); }
+    };
+  };
+
+  draw({ loading:true, sel:new Set() });
+  try{
+    const r = await fetch("/api/discord/channels",{cache:"no-store"});
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error||"Could not load channels");
+    draw({ data, sel:new Set(data.selected||[]) });
+  }catch(e){
+    draw({ loading:false, data:{guilds:[],canSave:false,source:"env",note:""}, sel:new Set(), error:e.message });
+  }
+}
+$("settings").addEventListener("click", openSettings);
+
+async function loadAccount(){
+  try{
+    const r = await fetch("/api/alpaca/account",{cache:"no-store"});
+    const j = await r.json();
+    if(!r.ok){ $("acct").innerHTML = `<span style="color:var(--warn)">Alpaca not connected — ${esc(j.error||"")}</span>`; return; }
+    const a = j.account;
+    $("acct").innerHTML =
+      `${j.paper?'<span class="paper">PAPER</span>':'<span class="liveflag">⚠️ LIVE MONEY</span>'}
+       Equity <b>$${esc(Number(a.equity).toLocaleString())}</b>
+       Buying power <b>$${esc(Number(a.buying_power).toLocaleString())}</b>
+       ${a.options_approved_level!=null?`Options level <b>${esc(a.options_approved_level)}</b>`:""}
+       ${j.positions.length?`Positions <b>${j.positions.length}</b>`:""}`;
+  }catch{ $("acct").innerHTML = ""; }
+}
+
+function renderTabs(all){
+  const names = [...new Set(all.map(m=>m.channel_name))];
+  const count = n => all.filter(m=>m.channel_name===n).length;
+  const tab = (key,label,n) =>
+    `<button class="tab ${filter===key?"on":""}" data-f="${esc(key)}">${label}<span class="c">${n}</span></button>`;
+  $("tabs").innerHTML = tab("all","All channels",all.length) +
+    names.map(n=>tab(n,"#"+esc(n),count(n))).join("");
+  $("tabs").querySelectorAll(".tab").forEach(b=>b.onclick=()=>{ filter=b.dataset.f; render(latest); });
+}
+
+function render(data){
+  latest = data;
+  const all = data.messages;
+  $("error").innerHTML = "";
+  renderTabs(all);
+
+  const msgs = filter==="all" ? all : all.filter(m=>m.channel_name===filter);
+  const chans = [...new Set(all.map(m=>m.channel_name))];
+  $("title").innerHTML = (filter==="all"
+      ? `Trade Dashboard <span class="tag">${chans.length} CHANNELS</span>`
+      : `#${esc(filter)} <span class="tag">LIVE</span>`);
+  $("sub").textContent = `${msgs.length} messages · updated ${fmt(data.fetchedAt)}`;
+
+  const times = msgs.map(m=>new Date(m.timestamp)).sort((a,b)=>a-b);
+  const authors = [...new Set(msgs.map(m=>m.author))];
+  const counts = msgs.reduce((a,m)=>((a[m.type]=(a[m.type]||0)+1),a),{});
+  const signals = msgs.filter(m=>m.trade).length;
+
+  $("kpis").innerHTML = [
+    [msgs.length,"Messages"],[signals,"Trade Signals"],
+    [authors.length,"Contributors"],[(counts.alert||0),"Alerts 📈"],
+  ].map(([n,l])=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+
+  $("feed").innerHTML = [...msgs].reverse().map(m=>{
+    const meta = TYPE_META[m.type];
+    const isNew = !seen.has(m.id) && seen.size;
+    return `<article class="msg ${isNew?"new":""}">
+      <div class="msg-top"><div class="who">
+        <span class="av">${esc((m.author||"?")[0].toUpperCase())}</span>
+        <div><b>${esc(m.author)}<span class="chan">#${esc(m.channel_name)}</span></b><time>${fmt(m.timestamp)}</time></div>
+      </div><span class="badge" style="--c:${meta.color}">${meta.icon} ${meta.label}</span></div>
+      ${tradeHTML(m.trade, m)}
+      <pre class="body">${esc(m.content)}</pre>
+    </article>`;
+  }).join("") || "<p style='color:var(--muted-fg)'>No messages in this channel yet.</p>";
+  seen = new Set(all.map(m=>m.id));
+
+  $("feed").querySelectorAll(".trade-btn[data-mid]").forEach(b=>{
+    b.onclick = () => openTradeModal({ messageId:b.dataset.mid, channelId:b.dataset.cid });
+  });
+
+  const maxT = Math.max(1,...Object.values(counts));
+  $("types").innerHTML = Object.entries(TYPE_META).map(([k,meta])=>{
+    const n = counts[k]||0;
+    return `<div class="bar-row"><span class="bl">${meta.icon} ${meta.label}</span>
+      <div class="bt"><i style="width:${n/maxT*100}%;background:${meta.color}"></i></div><b>${n}</b></div>`;
+  }).join("");
+
+  $("summary").innerHTML = `
+    <div class="srow"><span class="bl">Channels</span><b>${chans.map(c=>"#"+esc(c)).join(", ")||"—"}</b></div>
+    <div class="srow"><span class="bl">Viewing</span><b>${filter==="all"?"All":"#"+esc(filter)}</b></div>
+    <div class="srow"><span class="bl">Contributors</span><b>${esc(authors.join(", ")||"—")}</b></div>
+    <div class="srow"><span class="bl">First message</span><b>${fmt(times[0])}</b></div>
+    <div class="srow"><span class="bl">Latest message</span><b>${fmt(times[times.length-1])}</b></div>
+    <p class="note">⚠️ Signals are auto-parsed from message text and may be incomplete. Not financial advice.</p>`;
+
+  $("foot").textContent = `Live · polls every ${POLL_MS/1000}s · last update ${fmt(data.fetchedAt)}`;
+}
+
+/* ---------------- polling ---------------- */
+async function tick(){
+  try{
+    const r = await fetch("/api/messages",{cache:"no-store"});
+    if(r.status === 401){ showGate("Session expired — enter the passcode again."); return; }
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+    await loadOrders();          // refresh fills/P&L alongside messages
+    render(j);
+  }catch(e){
+    $("error").innerHTML = `<div class="err"><b>Couldn't load messages.</b> ${esc(e.message)}<br>
+      Check <code>DISCORD_TOKEN</code> and <code>CHANNEL_ID</code> in Vercel → Settings → Environment Variables.</div>`;
+  }
+}
+function start(){ tick(); loadAccount(); if(!timer) timer = setInterval(tick, POLL_MS); }
+
+// Probe session on load: authed -> dashboard, else -> gate.
+(async ()=>{
+  const r = await fetch("/api/messages",{cache:"no-store"}).catch(()=>null);
+  if(r && r.status === 401){ showGate(); return; }
+  showApp();
+  if(r && r.ok){
+    const data = await r.json();
+    await loadOrders();
+    render(data); loadAccount();
+    if(!timer) timer = setInterval(tick, POLL_MS);
+  } else start();
+})();
+</script></body></html>
